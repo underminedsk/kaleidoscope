@@ -47,7 +47,7 @@ def puzzle_solved(current_game_state):
 
 if __name__ == '__main__':
     print 'rules: (1) all nodes start as %s' % STATES[0]
-    print 'rules: (2) win make all the nodes %s' % STATES[-1]
+    print '       (2) win make all the nodes %s' % STATES[-1]
     print '       (3) choosing a node changes the color of the other nodes. '
     print '       (4) node colors are %s' % ' -> '.join(STATES)
     moves = 0
