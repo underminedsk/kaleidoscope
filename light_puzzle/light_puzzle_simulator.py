@@ -1,5 +1,7 @@
 import sys
 
+import math
+
 MAX_STATE=5
 NUM_NODES=3
 
@@ -20,9 +22,10 @@ while 1: #loop forever
             new_state = []
             for state_idx in range(0,NUM_NODES): #loop through nodes in current state
                 #if this is the node user activated, then leave value the same, otherwise increase state by 1
-                new_value_for_idx = state[state_idx]+1 if state_idx != j else state[state_idx]
+                new_value_for_idx = state[state_idx]+abs(state_idx-j)
+                #new_value_for_idx = state[state_idx]+1 if state_idx != j else state[state_idx]
                 #if we've reached max state, drop back to zero.
-                if new_value_for_idx == MAX_STATE:
+                if new_value_for_idx >= MAX_STATE:
                     new_value_for_idx = 0
                 new_state.append(new_value_for_idx)
             new_states.append(new_state) #add computed state to possible states

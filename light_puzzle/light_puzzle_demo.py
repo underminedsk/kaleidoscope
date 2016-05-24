@@ -1,13 +1,13 @@
 MAX_ALLOWED_MOVES = 9999
 NUM_NODES = 3
 
-#STATES = ['RED', 'ORANGE', 'YELLOW']
-STATES = ['RED', 'ORANGE', 'YELLOW', 'GREEN', 'BLUE']
+STATES = ['RED', 'ORANGE', 'YELLOW']
+#STATES = ['RED', 'ORANGE', 'YELLOW', 'GREEN', 'BLUE']
 
 
 def initial_game_state():
-    return [STATES[0] for i in range(0,NUM_NODES)]
-
+    #return [STATES[0] for i in range(0,NUM_NODES)]
+    return ['RED', 'ORANGE', 'YELLOW']
 
 def get_user_input():
     choice = raw_input('choose a node (1-%s)):' % (NUM_NODES))
