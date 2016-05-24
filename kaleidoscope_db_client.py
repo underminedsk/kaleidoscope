@@ -22,7 +22,7 @@ class User(Base):
     video4 = Column(String)
 
     def __repr__(self):
-        return '<User(id=%s, name=%s, done1=%s, done1=%s, done1=%s, tries1=%s, tries1=%s, tries1=%s, video1=%s, ' \
+        return '<User(id=%s, name=%s, done1=%s, done2=%s, done3=%s, tries1=%s, tries2=%s, tries3=%s, video1=%s, ' \
                'video2=%s, video3=%s, video4=%s)>' % (self.id, self.name, self.done1, self.done2, self.done3, self.tries1,
                                                    self.tries2, self.tries3, self.video1, self.video2, self.video3, self.video4)
 
@@ -65,7 +65,7 @@ class KaleidoscopeDBClient(object):
 
 if __name__ == '__main__':
 
-    #connects to kaleidoscope_users.db database file. in current working dir  if one doesnt exist a new file is created
+    #connects to kaleidoscope_users.db database file. in current working dir if one doesnt exist a new file is created
     with KaleidoscopeDBClient('kaleidoscope_users.db') as client:
 
         #create a new user object.  only name is required.
