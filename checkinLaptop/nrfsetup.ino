@@ -29,24 +29,21 @@ void nrfSetup(void) {
   radio.powerUp();                        //Power up the radio
 }
 
-void waitForRFdata(byte receivedData[], uint8_t receiveSize) { 
-  radio.startListening();
-  
-  while (!radio.available()) {
-    delay(100);
+boolean receivedRFData(byte receivedData[], uint8_t receiveSize) { 
+  if (radio.available()) {
+    Sprintln("found data!");
+    radio.read(receivedData, receiveSize);
+    dump_byte_array(receivedData, receiveSize); Sprintln();
+    return true;
   }
-  Serial.println("found data!");
-  radio.read(receivedData, receiveSize);
-  Serial.println("read data!");
-  //dump_byte_array(receivedData, receiveSize); Serial.println();
+  return false;  
 }
-/*
-void sendRFresponse(
-    if (isNewPlayer(playerUid, sizeof(playerUid))) {  //send confirmation player exists      
-      nrfData[0] = 'Y';       
-    } 
-    else {
-      nrfData[0] = 'N'; 
-    }
-    radio.stopListening();
-    radio.write(nrfData,1);*/
+
+boolean sendRFData(byte dataToSend[], uint8_t sendSize) {
+  boolean sendStatus;
+  radio.stopListening();
+  sendStatus = radio.write(dataToSend, sendSize);
+  radio.startListening();
+  return sendStatus;
+}
+ 

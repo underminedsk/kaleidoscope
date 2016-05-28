@@ -11,13 +11,9 @@ MFRC522::MIFARE_Key key;
 
 void rfidSetup()
 {
-  //Serial.begin(9600); // Initialize serial communications with the PC
-  //while (!Serial);
-  pinMode(5, OUTPUT);
-  digitalWrite(5, HIGH);
   SPI.begin();        // Init SPI bus
   mfrc522.PCD_Init();
-
+  mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_33dB);  //RxGain_33dB RxGain_38dB RxGain_43dB RxGain_48dB
 
 
   for (byte i = 0; i < 6; i++) {
@@ -26,90 +22,73 @@ void rfidSetup()
 }
 
 
-boolean rfidDetected(byte uid[], int uidSize) {
+boolean rfidDetected(byte uid[], byte playerName[], byte playerData[]) {
   // Look for new cards
   if ( ! mfrc522.PICC_IsNewCardPresent())
     return false;
 
-  // Select one of the cards
+  // make sure nuid has been read
   if ( ! mfrc522.PICC_ReadCardSerial())
     return false;
 
-  // Show some details of the PICC (that is: the tag/card)
-  //Serial.print(F("Card UID:"));
-  //dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
-  MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
-  // Check for compatibility
-  if (    piccType != MFRC522::PICC_TYPE_MIFARE_MINI
-          &&  piccType != MFRC522::PICC_TYPE_MIFARE_1K
-          &&  piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-    //Serial.println(F("This sample only works with MIFARE Classic cards."));
-    return false;
-  }
-
-  //uid = mfrc522.uid.uidByte;
-  for (int i = 0; i < uidSize; i++) {
+  for (int i = 0; i < 4; i++) {
     uid[i] = mfrc522.uid.uidByte[i];
   }
+  Sprintln("found uid");
+  boolean status;
+  status = readRfid(playerName, name_rfid_block, 16); 
+  if (status != true) {return status;}
+  status = readRfid(playerData, data_rfid_block, 16); 
+  if (status != true) {return status;}
   return true;
 }
 
 boolean writeRfid(byte *dataBlock, byte blockAddr, byte bufferSize) {
-  byte trailerBlock   = 7;
+  byte trailerBlock   = (blockAddr/4)*4 + 3;
   MFRC522::StatusCode status;
   byte buffer[18];
   byte size = sizeof(buffer);
-  
 
-  dump_byte_array(dataBlock, bufferSize); Serial.println("input data above");
-
-    // Authenticate using key A
-    Serial.println(F("Authenticating using key A..."));
-    status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailerBlock, &key, &(mfrc522.uid));
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("PCD_Authenticate() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-        return false;
-    }
-  
+  status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailerBlock, &key, &(mfrc522.uid));
+  if (status != MFRC522::STATUS_OK) {return false;}
   status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(blockAddr, dataBlock, bufferSize);
-  if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("MIFARE_Write() failed: "));
-    Serial.println(mfrc522.GetStatusCodeName(status));
-  }
-
-  // Read data from the block (again, should now be what we have written)
-  Serial.print(F("Reading data from block ")); Serial.print(blockAddr);
-  Serial.println(F(" ..."));
-  status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(blockAddr, buffer, &size);
-  if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("MIFARE_Read() failed: "));
-    Serial.println(mfrc522.GetStatusCodeName(status));
-  }
-  Serial.print(F("Data in block ")); Serial.print(blockAddr); Serial.println(F(":"));
-  dump_byte_array(buffer, 16); Serial.println();
-
-  // Check that data in block is what we have written
-  // by counting the number of bytes that are equal
-  Serial.println(F("Checking result..."));
-  byte count = 0;
-  for (byte i = 0; i < 16; i++) {
-    // Compare buffer (= what we've read) with dataBlock (= what we've written)
-    if (buffer[i] == dataBlock[i])
-      count++;
-  }
-  Serial.print(F("Number of bytes that match = ")); Serial.println(count);
-  if (count == 16) {
-    Serial.println(F("Success :-)"));
-    return true;
-  } else {
-    Serial.println(F("Failure, no match :-("));
-    Serial.println(F("  perhaps the write didn't work properly..."));
-    return false;
-  }
-  Serial.println();
-
+  if (status != MFRC522::STATUS_OK) {return false;} Sprintln("wrote rf data");
+  return true;
 }
+
+boolean readRfid(byte *dataBlock, byte blockAddr, byte bufferSize) {
+  byte trailerBlock   = (blockAddr/4)*4 + 3;
+  MFRC522::StatusCode status;
+  byte buffer[18];
+  byte size = sizeof(buffer);
+
+  status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailerBlock, &key, &(mfrc522.uid));
+  if (status != MFRC522::STATUS_OK) {return false;}
+  status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(blockAddr, buffer, &size);
+  if (status != MFRC522::STATUS_OK) {return false;}
+  
+  memcpy(dataBlock, buffer, 16);  Sprintln("read rf data");
+  return true;
+}
+
+boolean incrementBlockRfid(byte dataBlockByte) {
+  boolean status;
+  byte rfidData[16];
+  Sprintln("start increment function");
+  status = readRfid(rfidData,data_rfid_block,16); 
+  if (status != true) {return status;}
+  rfidData[dataBlockByte]++;
+  status = writeRfid(rfidData,data_rfid_block,16); 
+  return status;
+}
+
+void closeRfid() {
+  // Halt PICC
+  mfrc522.PICC_HaltA();
+  // Stop encryption on PCD
+  mfrc522.PCD_StopCrypto1();
+}
+
 
 void dump_byte_array(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {

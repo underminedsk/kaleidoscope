@@ -24,42 +24,38 @@ void nrfSetup() {
 }
 
 
-boolean isNewPlayer(byte uid[], uint8_t uidSize) {
-  //data[0] = uid;
-  pinMode(5, OUTPUT);     
-  digitalWrite(5, LOW);
-  radio.writeFast(uid, uidSize);
-  radio.stopListening();
-  radio.write(uid,uidSize);
-  
-  standby = radio.txStandBy(1000);
-  
-  radio.startListening();
-  Serial.println("blaaaaaaaaa");
-  while (!radio.available()){
-    delay(100);
+boolean checkForNewPlayer(boolean &isNew) {
+
+  byte nrfResponse[1];
+  if (receivedRFData(nrfResponse,1)) {
+    if (nrfResponse[0]=='Y') {
+      isNew = true;
+    } 
+    else if (nrfResponse[0]=='N') {
+      isNew = false;
+    }
   }
-  Serial.println("asdasda");
-  radio.read(&nrfData,1);
-  Serial.write(nrfData[0]);
-  if (nrfData[0]=='Y') {
-    return true;
-  } 
-  else {
-    return false;
-  }
-  
 }
 
 boolean videoDone() {
   return true;
 }
 
-void waitForRFdata(byte receivedData[], uint8_t receiveSize) { 
-  radio.startListening();
-  while (!radio.available()) {
-    delay(100);
+boolean receivedRFData(byte receivedData[], uint8_t receiveSize) { 
+  if (radio.available()) {
+    Sprintln("found data!");
+    radio.read(receivedData, receiveSize);
+    dump_byte_array(receivedData, receiveSize); Sprintln();
+    return true;
   }
-  radio.read(receivedData, receiveSize);
+  return false;  
+}
+
+boolean sendRFData(byte dataToSend[], uint8_t sendSize) {
+  boolean sendStatus;
+  radio.stopListening();
+  sendStatus = radio.write(dataToSend, sendSize);
+  radio.startListening();
+  return sendStatus;
 }
 
