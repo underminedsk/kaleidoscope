@@ -1,9 +1,6 @@
-
-
-
-#set up global constants for the puzzle.  these can be changed to alter the difficulty.
 import time
 
+#set up global constants for the puzzle.  these can be changed to alter the difficulty.
 ALLOWED_TIME_FOR_PUZZLE = 30 #player has this many seconds to complete the puzzle
 NUM_NODES = 3 #the game has 3 nodes.  until we fix the update_node() function to be dynamic, this is hardcoded to 3
 COLORS = ['red', 'orange', 'yellow'] #these are the states the nodes can be in.
@@ -11,7 +8,7 @@ COLORS = ['red', 'orange', 'yellow'] #these are the states the nodes can be in.
 
 #current puzzle state.  updated as the player tries to solve the puzzle
 active_user_id = None #the id of the user who last tagged in.  if set to null, the puzzle is not active.
-NODES = list()
+NODES = None
 start_time = 0 #the end time for the puzzle
 moves_made = 0
 
@@ -20,7 +17,7 @@ moves_made = 0
 def set_idle_state():
     global active_user_id, NODES
     active_user_id = None
-    NODES = ['OFF', 'OFF', 'OFF']
+    NODES = None
 
 
 def set_initial_puzzle_state_for_user(user_id):
@@ -68,6 +65,11 @@ def is_puzzle_solved():
 def elapsed_time():
     return time.time() - start_time
 
+
+# ------- output functions --------
+#note in microcontroller, these would change the color of the lights or maybe make them flash a pattern for
+#puzzle solved, timeout, etc.
+
 def publish_puzzle_started():
     print 'puzzle is starting.  you have %s seconds to make all the nodes %s' % (ALLOWED_TIME_FOR_PUZZLE, COLORS[-1])
 
@@ -83,20 +85,20 @@ def publish_puzzle_state():
     print NODES
 
 
-# ------- RFID input functions --------
+# ------- user input functions --------
 
 def is_rfid_card_present_at_reader():
     #checks to see whether an RFID card is present at the reader.
-    return False #TODO simulate with python variable
+    return False #TODO this would use the rfid library to make this check
 
 def read_user_id_from_rfid_card():
     #reads the user id from the card
-    return 1234 #TODO prob just return a constant user_id, or collect from command line
+    return 1234 #TODO this would use the rfid library to read the user id from the card
 
 # ------- button input functions -------
 
 def is_user_pushing_button(button_id):
-    return False #TODO simulate with python variable
+    return False #TODO this would check the input pin to see if the user is pushing teh button
 
 
 
@@ -129,6 +131,8 @@ def loop():
         #check each node to see if user is pushing this button
         for button_id in range(0, NUM_NODES):
             if is_user_pushing_button(button_id):
+                global moves_made
+                moves_made += 1
                 update_nodes(button_id)
                 publish_puzzle_state()
 
