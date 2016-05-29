@@ -8,9 +8,9 @@ COLORS = ['red', 'orange', 'yellow'] #these are the states the nodes can be in.
 
 #current puzzle state.  updated as the player tries to solve the puzzle
 active_user_id = None #the id of the user who last tagged in.  if set to null, the puzzle is not active.
-NODES = None
-start_time = 0 #the end time for the puzzle
-moves_made = 0
+NODES = None #when the puzzle is initialized, this represents the state of the puzzle.  the outputs (i.e. lights) should
+#be updated to match the state of this array.
+start_time = 0 #the system time the puzzle started.  used to determine if the time limit has been reached.
 
 
 
@@ -131,11 +131,9 @@ def loop():
         #check each node to see if user is pushing this button
         for button_id in range(0, NUM_NODES):
             if is_user_pushing_button(button_id):
-                global moves_made
-                moves_made += 1
                 update_nodes(button_id)
                 publish_puzzle_state()
-
+    time.sleep(0.1) #sleep for 10 milliseconds
     return 0 #puzzle not solved
 
 
@@ -144,7 +142,7 @@ if __name__ == '__main__':
 
     puzzle_solved = 0
     while not loop():
-        time.sleep(0.1) #sleep 100 milliseconds
+        pass
 
 
 
