@@ -143,26 +143,3 @@ if __name__ == '__main__':
     puzzle_solved = 0
     while not loop():
         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #check to see if buttons have been pressed:
-
-
-    #check to see if a button has been activated.  If so:
-        #update internal game state
-        #synchronize external nodes to internal game state
-        #check for 'puzzle solved' condition
-    #check for game timeout condition.  If so:
-        #notify user timed out
-        #reset puzzle
