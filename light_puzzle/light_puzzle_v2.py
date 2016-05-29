@@ -139,7 +139,5 @@ def loop():
 
 if __name__ == '__main__':
     setup()
-
-    puzzle_solved = 0
     while not loop():
         pass
