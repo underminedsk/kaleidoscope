@@ -10,7 +10,7 @@ COLORS = ['red', 'orange', 'yellow'] #these are the states the nodes can be in.
 active_user_id = None #the id of the user who last tagged in.  if set to null, the puzzle is not active.
 NODES = None #when the puzzle is initialized, this represents the state of the puzzle.  the outputs (i.e. lights) should
 #be updated to match the state of this array.
-start_time = 0 #the system time the puzzle started.  used to determine if the time limit has been reached.
+start_time = None #the system time the puzzle started.  used to determine if the time limit has been reached.
 
 
 
@@ -21,7 +21,7 @@ def set_idle_state():
 
 
 def set_initial_puzzle_state_for_user(user_id):
-    global active_user_id, NODES, start_time, moves_made #declare global so this function modifies these global variables.
+    global active_user_id, NODES, start_time #declare global so this function modifies these global variables.
     NODES = [COLORS[0] for i in range(0,NUM_NODES)] #initialize nodes to first color in the sequence
     start_time = time.time()
     moves_made = 0
@@ -109,7 +109,7 @@ def setup():
 def loop():
     if active_user_id is None:
         #no user is currently checked in to the puzzle. see if a user is trying to check in right now
-        if read_user_id_from_rfid_card():
+        if is_rfid_card_present_at_reader():
             #ok, the user is scanning their card right now.  set the active user_id and return
             new_user_id = read_user_id_from_rfid_card()
             set_initial_puzzle_state_for_user(new_user_id)
