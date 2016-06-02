@@ -30,22 +30,31 @@ boolean checkForNewPlayer(boolean &isNew) {
   if (receivedRFData(nrfResponse,1)) {
     if (nrfResponse[0]=='Y') {
       isNew = true;
+      return true;
     } 
     else if (nrfResponse[0]=='N') {
       isNew = false;
+      return true;
     }
   }
+  return false;
 }
 
 boolean videoDone() {
-  return true;
+  byte videoDoneRf[1];
+  if (receivedRFData(videoDoneRf,1)) {
+    if (videoDoneRf[0] == 'F' || videoDoneRf[0] == 'D') {
+      return true;
+    }
+  }
+  return false;
 }
 
 boolean receivedRFData(byte receivedData[], uint8_t receiveSize) { 
   if (radio.available()) {
     Sprintln("found data!");
     radio.read(receivedData, receiveSize);
-    dump_byte_array(receivedData, receiveSize); Sprintln();
+    //dump_byte_array(receivedData, receiveSize); Sprintln();
     return true;
   }
   return false;  
@@ -53,8 +62,17 @@ boolean receivedRFData(byte receivedData[], uint8_t receiveSize) {
 
 boolean sendRFData(byte dataToSend[], uint8_t sendSize) {
   boolean sendStatus;
+  int sendTries = 0;
   radio.stopListening();
-  sendStatus = radio.write(dataToSend, sendSize);
+  //sendStatus = radio.write(dataToSend, sendSize);
+  while (sendTries < 10) {
+    sendStatus = radio.write(dataToSend, sendSize);
+    if (sendStatus) {
+      break;
+    }
+    sendTries++;
+    delay(100);
+  }
   radio.startListening();
   return sendStatus;
 }

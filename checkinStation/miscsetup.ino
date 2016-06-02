@@ -80,3 +80,15 @@ void updateLcd(byte val, byte &letterNum) {
   lcd.setCursor(letterNum, 2);
 }
 
+void lcdMessage(String first, String second, String third, String fourth) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(first);
+  lcd.setCursor(0, 1);
+  lcd.print(second);
+  lcd.setCursor(0, 2);
+  lcd.print(third);
+  lcd.setCursor(0, 3);
+  lcd.print(fourth);
+}
+

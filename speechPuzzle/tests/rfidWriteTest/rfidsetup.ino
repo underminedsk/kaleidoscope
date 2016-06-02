@@ -85,6 +85,17 @@ boolean incrementBlockRfid(byte dataBlockByte) {
   return status;
 }
 
+boolean resetProfileRfid() {
+  boolean status;
+  byte rfidData[16] = {0};
+  status = writeRfid(rfidData,name_rfid_block,16); 
+  if (status != true) {return status;}
+  status = writeRfid(rfidData,data_rfid_block,16); 
+  if (status != true) {return status;}
+  Sprintln("reset successful");
+  return status;
+}
+
 void closeRfid() {
   // Halt PICC
   mfrc522.PICC_HaltA();

@@ -1,5 +1,5 @@
-#define Sprintln(a) (Serial.println(a))
-//#define Sprintln(a)
+//#define Sprintln(a) (Serial.println(F(a)))
+#define Sprintln(a)
 
 #define WAIT_FOR_TAG 0
 #define WAIT_FOR_RESPONSE 1
@@ -11,6 +11,8 @@ uint8_t checkin_fsm_state = WAIT_FOR_TAG;
 #define checkin_tries_byte 0
 #define speech_tries_byte 1
 #define light_tries_byte 2 
+#define speech_done_byte 5
+#define speech_puzzlenum_byte 9 
 #define name_rfid_block 4 
 #define data_rfid_block 5 
 
@@ -25,8 +27,8 @@ byte nrfData[40];
 byte letterNum;
 
 
-String firstLine = "Hello";
-String secondLine = "What's your name?";
+String firstLine = "Hello seeker";
+String secondLine = "What is your name?";
 String thirdLine = "";
 String fourthLine = "";
 
@@ -52,34 +54,37 @@ void loop() {
   {
     case WAIT_FOR_TAG:  //Starting state to wait for RFID tag
       
-      if (rfidDetected(playerUid, playerName, playerData) || timeOut()) {
+      if (rfidDetected(playerUid, playerName, playerData, checkin_tries_byte)) {
         // check rfid card exists in database
-
+        
         // increment check in tries on rfid tag
-        if (!incrementBlockRfid(checkin_tries_byte)) {break;} 
-        closeRfid();       
+        //if (!incrementBlockRfid(checkin_tries_byte)) {break;} 
+               
         Sprintln("inc successful");
         
         createPlayerPacket(playerUid, playerName, playerData, playerPacket);
-                 
+        //dump_byte_array(playerPacket, playerPacketSize);          
         if (sendRFData(playerPacket, playerPacketSize)) {
           checkin_fsm_state = WAIT_FOR_RESPONSE;
           Sprintln("wrote rf uid");
+        } else {
+          Sprintln("RF send fail");
         }
-      }
-
+      } 
+      closeRfid();
       break;
 
     case WAIT_FOR_RESPONSE:
       boolean isNewPlayer;
       
       if (checkForNewPlayer(isNewPlayer)) {
+          lcdDisplayOn();
           if (isNewPlayer) {
             memset(playerName, 0, sizeof(playerName));
-            lcdDisplayOn();
             letterNum = 0;
             checkin_fsm_state = ENTER_NAME;
           } else {
+            lcdMessage("Welcome back","(char*)playerName","Put on efficient","hearing aids now");
             checkin_fsm_state = PLAY_VIDEO;  
           }
         }
@@ -90,29 +95,40 @@ void loop() {
       
       if (nameEntered()) {
         checkin_fsm_state = WRITE_TAG;
+        // setup new player data
+        memset(playerData, 0, sizeof(playerData));
+        playerData[speech_puzzlenum_byte] = random(0,4);
+        playerData[checkin_tries_byte] = 1;
       }
       break;
 
     case WRITE_TAG:
       // Display name and ask to retag
       byte oldPlayerName[16];
+      byte oldPlayerData[16];
+      byte writeTagDone[1];
 
-      if (rfidDetected(playerUid, oldPlayerName, playerData) || timeOut()) {
-        if (!writeRfid(playerName, name_rfid_block, 16)) {break;} 
-        closeRfid();
-        lcdSetup();
+      if (rfidDetected(playerUid, oldPlayerName, oldPlayerData, checkin_tries_byte)) {
+        if (!writeRfid(playerName, name_rfid_block, 16)) {break;}
+        if (!writeRfid(playerData, data_rfid_block, 16)) {break;}
+        writeTagDone[0] = 'W';
+        if (!sendRFData(writeTagDone, 1)) {Sprintln("RF send fail"); break;}
+        
+        lcdMessage("Please put on","efficient hearing","device now","");
+        //lcdSetup();
         memset(playerName, 0, sizeof(playerName)); //reset name
         checkin_fsm_state = PLAY_VIDEO;
-      }
+      } 
+      closeRfid();
       break;
 
     case PLAY_VIDEO:
       // Play video
 
       if (videoDone()) {
+        lcdSetup();
         checkin_fsm_state = WAIT_FOR_TAG;
         Sprintln("Video Done!");
-        delay(3000);
       }
       break;
 
@@ -120,7 +136,7 @@ void loop() {
       break;
   }
   printState(); //Sprintln(checkin_fsm_state);
-  delay(500);              // wait for 100 ms
+  delay(100);              // wait for 100 ms
 }
 
 void printState()
@@ -136,8 +152,9 @@ void printState()
 }
 
 void createPlayerPacket(byte playerUid[], byte playerName[], byte playerData[], byte combined[]) {
-  memcpy(combined, playerUid, sizeof(playerUid));
-  memcpy(combined+sizeof(playerUid), playerName, sizeof(playerName));
-  memcpy(combined+sizeof(playerUid)+sizeof(playerName), playerData, sizeof(playerData));
+  // for some reason, using sizeof(variable) in memcpy messes up
+  memcpy(combined, playerUid, 4);
+  memcpy(combined+4, playerName, 16);
+  memcpy(combined+20, playerData, 16);
 }
 

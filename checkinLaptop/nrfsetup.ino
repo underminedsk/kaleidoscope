@@ -33,7 +33,7 @@ boolean receivedRFData(byte receivedData[], uint8_t receiveSize) {
   if (radio.available()) {
     Sprintln("found data!");
     radio.read(receivedData, receiveSize);
-    dump_byte_array(receivedData, receiveSize); Sprintln();
+    //dump_byte_array(receivedData, receiveSize); Sprintln();
     return true;
   }
   return false;  

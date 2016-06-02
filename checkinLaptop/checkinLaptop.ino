@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include "RF24.h"
+#include <IRremote.h>
 
 //#define Sprintln(a) (Serial.println(a))
 #define Sprintln(a)
@@ -8,7 +9,8 @@
 #define CHECK_ID 1
 #define SEND_RESPONSE 2
 #define ENTER_NAME 3
-#define PLAY_VIDEO 4
+#define WAIT_FOR_WRITE_TAG 4
+#define PLAY_VIDEO 5
 uint8_t checkin_fsm_state = WAIT_FOR_TAG;
 
 
@@ -28,7 +30,6 @@ boolean isNewPlayer;
 
 void setup() {
   nrfSetup();
-  Sprintln("bla bla bla");
 }
 
 void loop()
@@ -39,8 +40,10 @@ void loop()
     case WAIT_FOR_TAG:  //Starting state to wait for RFID tag
 
       if (receivedRFData(playerPacket, playerPacketSize)) {
-        dump_byte_array(playerPacket, playerPacketSize); Sprintln();
-        parsePlayerPacket(playerUid, playerName, playerData, playerPacket);      
+        parsePlayerPacket(playerUid, playerName, playerData, playerPacket);
+        //Serial.print(playerPacketSize, DEC); Serial.print('\n');
+        //dump_byte_array(playerPacket, playerPacketSize);
+        Serial.write(playerPacket, playerPacketSize); Serial.print('\n');     
         checkin_fsm_state = CHECK_ID;       
       }
       
@@ -48,14 +51,13 @@ void loop()
 
     case CHECK_ID:
       
-      if (checkForNewPlayer(playerUid, isNewPlayer)) {
+      if (checkForNewPlayer(isNewPlayer)) {
         checkin_fsm_state = SEND_RESPONSE; 
       }
       break;
       
     case SEND_RESPONSE:
       byte response[1];
-      
       if (isNewPlayer) {
         response[0] = 'Y';
         if (sendRFData(response, 1)) {
@@ -65,6 +67,7 @@ void loop()
       else {
         response[0] = 'N';
         if (sendRFData(response, 1)) {
+          Serial.print("PLAY_VIDEO"); Serial.print('\n');
           checkin_fsm_state = PLAY_VIDEO;   
         }
       }  
@@ -73,13 +76,23 @@ void loop()
 
     case ENTER_NAME:
       if (nameEntered()) {
-        checkin_fsm_state = PLAY_VIDEO;
+        checkin_fsm_state = WAIT_FOR_WRITE_TAG;
+        
       }  
       break;
 
+    case WAIT_FOR_WRITE_TAG:
+      if (writeTagDone()) {
+        Serial.print("PLAY_VIDEO"); Serial.print('\n');
+        checkin_fsm_state = PLAY_VIDEO;
+      }
+      break;
+
     case PLAY_VIDEO:
-      checkin_fsm_state = WAIT_FOR_TAG;
-      delay(3000);
+      //Serial.print("PLAY_VIDEO"); Serial.print('\n');
+      if (videoDone()) {
+        checkin_fsm_state = WAIT_FOR_TAG;
+      }
       break;
 
     default: 
@@ -119,6 +132,7 @@ void printState()
     case CHECK_ID: Sprintln("CHECK_ID"); break;
     case SEND_RESPONSE: Sprintln("SEND_RESPONSE"); break;
     case ENTER_NAME: Sprintln("ENTER_NAME"); break;
+    case WAIT_FOR_WRITE_TAG: Sprintln("WAIT_FOR_WRITE_TAG"); break;
     case PLAY_VIDEO: Sprintln("PLAY_VIDEO"); break;
     default: Sprintln("Unknown State"); break;   
   }  
