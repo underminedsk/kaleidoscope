@@ -13,11 +13,13 @@ MFRC522::MIFARE_Key key;
 
 //game constants
 const int NUM_NODES = 3; //this game has 3 nodes
-const int ALLOWED_TIME_FOR_PUZZLE = 10000; //user has this many milliseconds to solve the game, after which it returns to idle.
-const int NUM_COLORS = 4; //TODO can I get this at runtime?
+const long ALLOWED_TIME_FOR_PUZZLE = 60000; //user has this many milliseconds to solve the game, after which it returns to idle.
+const int NUM_COLORS = 3; //TODO can I get this at runtime?
 const int MAX_COLOR_LEN = 8; //maximum number of characters of any color 
-const char COLORS[NUM_COLORS][MAX_COLOR_LEN] = {"RED", "BLUE", "YELLOW", "GREEN"}; 
-const CRGB CRGB_COLORS[NUM_COLORS] = {CRGB::Red, CRGB::Blue, CRGB::Yellow, CRGB::Green};
+const char COLORS[NUM_COLORS][MAX_COLOR_LEN] = {"RED", "GREEN", "BLUE"};//, "GREEN"}; 
+const CRGB CRGB_COLORS[NUM_COLORS] = {CRGB::Red, CRGB::Green, CRGB::Blue };//, CRGB::Green};
+
+//pin definitions
 const int button_pins[NUM_NODES] = {2, 3, 4}; //holds the pin ids of the buttons
 const int led_pins[NUM_NODES] = {5, 6, 7}; //holds the poins of the buttons 
 const int LED_PIN_0 = 5;
@@ -184,7 +186,9 @@ void setup() {
   log("setup complete");
 }
 
-void loop() { 
+int success = 0;
+int num_success = 100000;
+void loop() { //idle state 
   if (nuid[0] == '\0') {
     //read card user id logic here
     if ( read_nuid_from_rfid_card() ) {
@@ -192,23 +196,24 @@ void loop() {
       publish_puzzle_started();  
       publish_current_puzzle_state();
     } 
-  } else {
-    //did we time out?
-    if (elapsed_time() > ALLOWED_TIME_FOR_PUZZLE) { 
-      publish_puzzle_timed_out();  
-      set_idle_state(); 
-    } 
-
-    //is node button currently being pressed?
-    for (int i=0; i<NUM_NODES; i++) {
-      if (is_node_activated(i)) {
-         update_puzzle_state_for_node_activated(i);
-         publish_current_puzzle_state(); 
-         break; //dont process any more buttons this round.
-      }
-    } 
-
-    if (puzzle_is_solved()) { //has the user solved the puzzle? 
+  } else { //active state 
+    if (!puzzle_is_solved()) {
+      //did we time out?
+      if (elapsed_time() > ALLOWED_TIME_FOR_PUZZLE) { 
+        publish_puzzle_timed_out();  
+        set_idle_state(); 
+      } 
+  
+      //is node button currently being pressed?
+      for (int i=0; i<NUM_NODES; i++) {
+        if (is_node_activated(i)) {
+           update_puzzle_state_for_node_activated(i);
+           publish_current_puzzle_state(); 
+           break; //dont process any more buttons this round.
+        }
+      } 
+    } else { //has the user solved the puzzle?  
+      log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
       publish_puzzle_solved();
       set_idle_state(); 
     } 
@@ -221,12 +226,18 @@ void loop() {
 // ---- puzzle state publishing functions.  these should update the lights to reflect the current internal state  ---- 
 void publish_puzzle_started() {
   //this might actually do nothing, or might just be the same as publish puzzle state
-  int time = ALLOWED_TIME_FOR_PUZZLE / 1000;
+  long time = ALLOWED_TIME_FOR_PUZZLE / 1000;
   log_d("puzzle has been activated, user has %d seconds to solve it.", time);  
 }
 
+#define FRAMES_PER_SECOND 60
 void publish_puzzle_solved() {
-  log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
+  //log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
+  for (int i=0; i<1000; i++) { 
+    fire2012(); 
+    FastLED.show(); // display this frame
+    FastLED.delay(1000 / FRAMES_PER_SECOND);
+  }
 }
 
 void publish_puzzle_timed_out() {
