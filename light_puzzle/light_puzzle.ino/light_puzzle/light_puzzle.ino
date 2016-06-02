@@ -2,6 +2,8 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
+#include "FastLED.h"
+
 #define SS_PIN 10
 #define RST_PIN 9
 
@@ -11,11 +13,19 @@ MFRC522::MIFARE_Key key;
 
 //game constants
 const int NUM_NODES = 3; //this game has 3 nodes
-const int ALLOWED_TIME_FOR_PUZZLE = 60000; //user has this many milliseconds to solve the game, after which it returns to idle.
-const int NUM_COLORS = 3; //TODO can I get this at runtime?
+const int ALLOWED_TIME_FOR_PUZZLE = 10000; //user has this many milliseconds to solve the game, after which it returns to idle.
+const int NUM_COLORS = 4; //TODO can I get this at runtime?
 const int MAX_COLOR_LEN = 8; //maximum number of characters of any color 
-const char COLORS[NUM_COLORS][MAX_COLOR_LEN] = {"RED", "ORANGE", "YELLOW"};
-const int button_pins[NUM_NODES] = {1, 2, 3}; //holds the pin ids of the buttons
+const char COLORS[NUM_COLORS][MAX_COLOR_LEN] = {"RED", "BLUE", "YELLOW", "GREEN"}; 
+const CRGB CRGB_COLORS[NUM_COLORS] = {CRGB::Red, CRGB::Blue, CRGB::Yellow, CRGB::Green};
+const int button_pins[NUM_NODES] = {2, 3, 4}; //holds the pin ids of the buttons
+const int led_pins[NUM_NODES] = {5, 6, 7}; //holds the poins of the buttons 
+const int LED_PIN_0 = 5;
+const int LED_PIN_1 = 6;
+const int LED_PIN_2 = 7;
+const int NUM_LEDS = 11;
+
+CRGB leds[NUM_NODES][NUM_LEDS]; //define array of leds.  one strip per node
 
 //array to store user id.  sometimes the user_id will be null, signifying that the game
 //is in the idle state.
@@ -25,6 +35,7 @@ byte nuid[3];
 //will be updated to match the values in this array using the 'publish_current_state'
 //function below.
 char puzzle_state[NUM_NODES][MAX_COLOR_LEN]; 
+CRGB puzzle_state_crgb[NUM_NODES]; 
 
 //holds the start time of the puzzle
 unsigned long puzzle_start_time;
@@ -35,13 +46,18 @@ void set_idle_state() {
   nuid[0] = '\0';
   for (int i=0; i<NUM_NODES; i++) {
     strcpy(puzzle_state[i], "");
-  }
+    puzzle_state_crgb[i] = CRGB::Black;
+    change_led_color(i, CRGB::Black); 
+  } 
+  FastLED.show();
+  
   log("idle state set");
 }
 
 void set_active_state() {
   for (int i=0; i<NUM_NODES; i++) {
     strcpy(puzzle_state[i], COLORS[0]);
+    puzzle_state_crgb[i] = CRGB_COLORS[0];
   }
   puzzle_start_time = millis();
 }
@@ -76,30 +92,35 @@ bool puzzle_is_solved() {
 
 long last_debounce_times[NUM_NODES]; //store the last debounce times for each node 
 int last_button_states[NUM_NODES]; //the last state read from the buttons.
-const long DEBOUNCE_TIME = 1000; 
+int button_states[NUM_NODES];
+const long DEBOUNCE_TIME = 50; 
 /*
  * returns true if a node has been activated by the user.  this implementation uses digital buttons.
  */
 bool is_node_activated(int button_index) {
   int button_state = digitalRead(button_pins[button_index]);
+  //log_dd("button %d state read as %d", button_index, button_state); 
 
   // If the switch has changed state since last time we checked, record the time
   if (button_state != last_button_states[button_index]) {
     last_debounce_times[button_index] = millis();
   }
 
-  bool registered_button_press = false;
-  if ((millis() - last_debounce_times[button_index]) > DEBOUNCE_TIME) {
+  bool registered_button_press = false; 
+  long elapsed_time = millis() - last_debounce_times[button_index];
+  if (elapsed_time > DEBOUNCE_TIME) {
     //ok, reading hasn't changed for longer than the debounce time, so it must 
-    //not be noise.   
-    if (button_state == HIGH) {
-      log("button has changed state to high");
-    } else if (button_state == LOW) {
-      log("button has changed state to low");
-    }
-
-    if (button_state == HIGH) {
-      registered_button_press = true;
+    //not be noise.    
+    
+    // if the button state has changed:
+    if (button_state != button_states[button_index]) {
+      button_states[button_index] = button_state;
+      
+      //register button press if the new button state is HIGH
+      if (button_state == HIGH) {
+        registered_button_press = true;
+        //log_d("button %d pressed", button_index);
+      }
     }
   }
 
@@ -129,6 +150,7 @@ void update_node_state(int node_id, int num_colors_to_change_by) {
    int cur_idx_of_color = get_index_of_color(puzzle_state[node_id]);
    int new_idx_of_color = (cur_idx_of_color + num_colors_to_change_by) % NUM_COLORS;
    strcpy(puzzle_state[node_id], COLORS[new_idx_of_color]);
+   puzzle_state_crgb[node_id] = CRGB_COLORS[new_idx_of_color];
 }
 
 int get_index_of_color(char color[]) {
@@ -141,15 +163,22 @@ int get_index_of_color(char color[]) {
 }
 
 void setup() {
-  // put your setup code here, to run once:
+  //rfid setup
   Serial.begin(9600);
   SPI.begin(); // Init SPI bus
   rfid.PCD_Init(); // Init MFRC522 
 
-//  for (int i=0; i<NUM_NODES; i++) {
-//    last_button_states[i] = LOW; //set last button state to off.
-//    pinMode(button_pins[i], INPUT); //initialize button pins for reading
-//  } 
+  //button initialization
+  for (int i=0; i<NUM_NODES; i++) {
+    last_button_states[i] = LOW; //set initial button state to off.
+    last_debounce_times[i] = millis();
+    pinMode(button_pins[i], INPUT); //initialize button pins for reading
+  } 
+
+  //led setup
+  FastLED.addLeds<WS2812B, LED_PIN_0, GRB>(leds[0], NUM_LEDS);
+  FastLED.addLeds<WS2812B, LED_PIN_1, GRB>(leds[1], NUM_LEDS);
+  FastLED.addLeds<WS2812B, LED_PIN_2, GRB>(leds[2], NUM_LEDS);
   
   set_idle_state();
   log("setup complete");
@@ -174,8 +203,7 @@ void loop() {
     for (int i=0; i<NUM_NODES; i++) {
       if (is_node_activated(i)) {
          update_puzzle_state_for_node_activated(i);
-         publish_current_puzzle_state();
-         delay(100);
+         publish_current_puzzle_state(); 
          break; //dont process any more buttons this round.
       }
     } 
@@ -184,8 +212,7 @@ void loop() {
       publish_puzzle_solved();
       set_idle_state(); 
     } 
-  }
-  
+  } 
 }
 
 
@@ -194,11 +221,12 @@ void loop() {
 // ---- puzzle state publishing functions.  these should update the lights to reflect the current internal state  ---- 
 void publish_puzzle_started() {
   //this might actually do nothing, or might just be the same as publish puzzle state
-  log("puzzle has been activated");  
+  int time = ALLOWED_TIME_FOR_PUZZLE / 1000;
+  log_d("puzzle has been activated, user has %d seconds to solve it.", time);  
 }
 
 void publish_puzzle_solved() {
-  log("puzzle has been solved");
+  log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
 }
 
 void publish_puzzle_timed_out() {
@@ -211,9 +239,17 @@ void publish_current_puzzle_state() {
   for (int i=0; i<NUM_NODES; i++) {
     log_partial(puzzle_state[i]);
     log_partial(" ");
+    change_led_color(i, puzzle_state_crgb[i]);
   }
+  FastLED.show();
   log(""); // line break
 } 
+
+void change_led_color(int led_idx, CRGB color) {
+  for (int i=0; i<NUM_LEDS; i++) {
+    leds[led_idx][i] = color;
+  }
+}
 
 // --- logging functions- just wrappers around serial.print
 void log(char msg[]) {
@@ -226,5 +262,28 @@ void log_partial(char msg[]) {
   Serial.print(msg);
 }
 
+void log_d(char msg[], int var) {
+  char buf[80];
+  sprintf(buf, msg, var);
+  log(buf);
+}
+
+void log_dd(char msg[], int var1, int var2) {
+  char buf[80];
+  sprintf(buf, msg, var1, var2);
+  log(buf);
+}
+
+void log_ddd(char msg[], int var1, int var2, int var3) {
+  char buf[80];
+  sprintf(buf, msg, var1, var2, var3);
+  log(buf);
+}
+
+void log_s(char msg[], char str[]) {
+  char buf[80];
+  sprintf(buf, msg, str);
+  log(buf);
+}
 
 
