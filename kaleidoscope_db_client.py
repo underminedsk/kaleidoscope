@@ -9,10 +9,12 @@ class User(Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
+    uid = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     done1 = Column(Boolean, default=False)
     done2 = Column(Boolean, default=False)
     done3 = Column(Boolean, default=False)
+    alldone = Column(Boolean, default=False)
     tries1 = Column(Integer, default=0)
     tries2 = Column(Integer, default=0)
     tries3 = Column(Integer, default=0)
@@ -22,8 +24,8 @@ class User(Base):
     video4 = Column(String)
 
     def __repr__(self):
-        return '<User(id=%s, name=%s, done1=%s, done2=%s, done3=%s, tries1=%s, tries2=%s, tries3=%s, video1=%s, ' \
-               'video2=%s, video3=%s, video4=%s)>' % (self.id, self.name, self.done1, self.done2, self.done3, self.tries1,
+        return '<User(id=%s, uid=%s, name=%s, done1=%s, done2=%s, done3=%s, alldone=%s, tries1=%s, tries2=%s, tries3=%s, video1=%s, ' \
+               'video2=%s, video3=%s, video4=%s)>' % (self.id, self.uid, self.name, self.done1, self.done2, self.done3, self.alldone, self.tries1,
                                                    self.tries2, self.tries3, self.video1, self.video2, self.video3, self.video4)
 
 
@@ -52,15 +54,21 @@ class KaleidoscopeDBClient(object):
     def find_by_name(self, name):
         return self.session.query(User).filter(User.name==name).all()
 
+    def find_by_uid(self, uid):
+        return self.session.query(User).filter(User.uid==uid).first()
+
     def find_all(self):
         return self.session.query(User).all()
+
+
+    def delete(self, user):
+        self.session.delete(user)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not exc_val:
             self.session.commit()
         else:
             self.session.rollback()
-
 
 
 if __name__ == '__main__':

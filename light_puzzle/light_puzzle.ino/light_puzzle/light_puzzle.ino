@@ -4,13 +4,6 @@
 
 #include "FastLED.h"
 
-#define SS_PIN 10
-#define RST_PIN 9
-
-//set up RFID functionality
-MFRC522 rfid(SS_PIN, RST_PIN); 
-MFRC522::MIFARE_Key key; 
-
 //game constants
 const int NUM_NODES = 3; //this game has 3 nodes
 const long ALLOWED_TIME_FOR_PUZZLE = 60000; //user has this many milliseconds to solve the game, after which it returns to idle.
@@ -25,13 +18,24 @@ const int led_pins[NUM_NODES] = {5, 6, 7}; //holds the poins of the buttons
 const int LED_PIN_0 = 5;
 const int LED_PIN_1 = 6;
 const int LED_PIN_2 = 7;
-const int NUM_LEDS = 11;
 
+
+//uid data locations:
+#define light_tries_byte 2 
+#define name_rfid_block 4 
+#define data_rfid_block 5 
+
+//LED definitions 
+const int NUM_LEDS_BUFFER = 11;
+const int NUM_LEDS_BOXES = 11;
+const int NUM_LEDS = NUM_LEDS_BOXES + NUM_LEDS_BUFFER;
 CRGB leds[NUM_NODES][NUM_LEDS]; //define array of leds.  one strip per node
 
-//array to store user id.  sometimes the user_id will be null, signifying that the game
-//is in the idle state.
-byte nuid[3]; 
+
+//array to store user id.  sometimes the user_id will be null, signifying that the game is in the idle state.
+byte nuid[4];
+byte playerName[16]; //array to read player name.  not being used in this puzzle but needed to pass to the rfid reading function
+byte playerData[16]; //array to read player data.  not being used in this puzzle but needed to pass to the rfid reading function
 
 //array to store the current state of the puzzle. the outputs of game (lights)
 //will be updated to match the values in this array using the 'publish_current_state'
@@ -49,8 +53,9 @@ void set_idle_state() {
   for (int i=0; i<NUM_NODES; i++) {
     strcpy(puzzle_state[i], "");
     puzzle_state_crgb[i] = CRGB::Black;
-    change_led_color(i, CRGB::Black); 
-  } 
+    change_led_color(i, CRGB::Black, 0); 
+    log_d("setting node %d to black", i);
+  }  
   FastLED.show();
   
   log("idle state set");
@@ -64,20 +69,6 @@ void set_active_state() {
   puzzle_start_time = millis();
 }
 
-bool read_nuid_from_rfid_card() {
-  // Look for new cards
-  if ( ! rfid.PICC_IsNewCardPresent())
-    return false;
-
-  // Verify if the NUID has been readed
-  if ( ! rfid.PICC_ReadCardSerial())
-    return false;
-
-  for (byte i = 0; i < 4; i++) {
-      nuid[i] = rfid.uid.uidByte[i];
-  }
-  return true;
-}
 
 unsigned long elapsed_time() { 
   return millis() - puzzle_start_time; 
@@ -166,9 +157,9 @@ int get_index_of_color(char color[]) {
 
 void setup() {
   //rfid setup
-  Serial.begin(9600);
-  SPI.begin(); // Init SPI bus
-  rfid.PCD_Init(); // Init MFRC522 
+  Serial.begin(9600); 
+
+  rfidSetup();
 
   //button initialization
   for (int i=0; i<NUM_NODES; i++) {
@@ -186,12 +177,10 @@ void setup() {
   log("setup complete");
 }
 
-int success = 0;
-int num_success = 100000;
 void loop() { //idle state 
   if (nuid[0] == '\0') {
     //read card user id logic here
-    if ( read_nuid_from_rfid_card() ) {
+    if ( rfidDetected(nuid, playerName, playerData, light_tries_byte) ) {
       set_active_state();
       publish_puzzle_started();  
       publish_current_puzzle_state();
@@ -201,7 +190,7 @@ void loop() { //idle state
       //did we time out?
       if (elapsed_time() > ALLOWED_TIME_FOR_PUZZLE) { 
         publish_puzzle_timed_out();  
-        set_idle_state(); 
+        set_idle_state();  
       } 
   
       //is node button currently being pressed?
@@ -214,10 +203,12 @@ void loop() { //idle state
       } 
     } else { //has the user solved the puzzle?  
       log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
-      publish_puzzle_solved();
+      publish_puzzle_solved();  
+      log("after puzzle solved"); 
       set_idle_state(); 
     } 
-  } 
+    closeRfid();
+  }   
 }
 
 
@@ -231,13 +222,44 @@ void publish_puzzle_started() {
 }
 
 #define FRAMES_PER_SECOND 60
-void publish_puzzle_solved() {
-  //log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
-  for (int i=0; i<1000; i++) { 
-    fire2012(); 
+int success = 0;
+int num_flash_blue = 6;
+long num_success = 200;
+void publish_puzzle_solved() { 
+  for (int i=0; i<num_flash_blue; i++) { 
+    for (int i=0; i<NUM_NODES; i++) {
+      //flash on and off
+      change_led_color(i, puzzle_state_crgb[i], 0); 
+    }
+    FastLED.show(); // display this frame
+    delay(500);
+    
+    for (int i=0; i<NUM_NODES; i++) {
+      //blink on and off briefly
+      change_led_color(i, CRGB::Black, 0); 
+    }
+    FastLED.show(); // display this frame
+    delay(500);
+  }
+
+  
+  for (int i=0; i<num_success; i++) {
+    for (int j=0; j<NUM_NODES; j++) {    
+      fire2012(leds[j], 0, NUM_LEDS);
+    } 
+    
     FastLED.show(); // display this frame
     FastLED.delay(1000 / FRAMES_PER_SECOND);
   }
+
+  
+  //log_d("puzzle has been solved in %d seconds", elapsed_time()/1000);
+//  for (int i=0; i<num_success; i++) {  
+//    for (int j=0; j<NUM_NODES; j++) {
+//      fire2012(leds[j], 0, NUM_LEDS); 
+//    }
+//  }
+  log("end of puzzle solved");
 }
 
 void publish_puzzle_timed_out() {
@@ -250,14 +272,14 @@ void publish_current_puzzle_state() {
   for (int i=0; i<NUM_NODES; i++) {
     log_partial(puzzle_state[i]);
     log_partial(" ");
-    change_led_color(i, puzzle_state_crgb[i]);
+    change_led_color(i, puzzle_state_crgb[i], NUM_LEDS_BUFFER);
   }
   FastLED.show();
   log(""); // line break
 } 
 
-void change_led_color(int led_idx, CRGB color) {
-  for (int i=0; i<NUM_LEDS; i++) {
+void change_led_color(int led_idx, CRGB color, int start_idx) {
+  for (int i=start_idx; i<NUM_LEDS; i++) {
     leds[led_idx][i] = color;
   }
 }
